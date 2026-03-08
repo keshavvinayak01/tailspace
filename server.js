@@ -239,5 +239,5 @@ app.use('/files', express.static(uploadDir));
 
 app.listen(argv.port, () => {
   console.log(`Tailspace running on port ${argv.port}`);
-  console.log(`Authorized owner: ${authorizedOwner}`);
+  console.log(`Authorized users: ${authorizedUsers.join(', ')}`);
 });
