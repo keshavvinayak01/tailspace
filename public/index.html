@@ -1,0 +1,497 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Tailspace</title>
+    <style>
+        body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; margin: 0; padding: 20px; background: #f4f4f9; color: #333; }
+        .container { max-width: 1000px; margin: 0 auto; background: white; padding: 30px; border-radius: 8px; box-shadow: 0 4px 6px rgba(0,0,0,0.1); }
+        h1 { color: #2c3e50; text-align: center; margin-bottom: 20px; }
+        
+        .usage-container { background: #ecf0f1; border-radius: 8px; padding: 15px; margin-bottom: 25px; display: flex; flex-direction: column; gap: 8px; }
+        .usage-header { display: flex; justify-content: space-between; font-size: 0.9em; font-weight: 600; color: #7f8c8d; }
+        .usage-bar-bg { background: #bdc3c7; height: 12px; border-radius: 6px; overflow: hidden; }
+        .usage-bar-fill { background: #3498db; height: 100%; transition: width 0.5s ease; width: 0%; }
+
+        .breadcrumb { background: #eee; padding: 10px 15px; border-radius: 4px; margin-bottom: 20px; display: flex; align-items: center; gap: 5px; font-weight: 500; }
+        .breadcrumb span { color: #7f8c8d; cursor: pointer; }
+        .breadcrumb span:hover { text-decoration: underline; color: #2980b9; }
+        .breadcrumb .active { color: #2c3e50; cursor: default; pointer-events: none; }
+
+        .upload-controls { display: flex; gap: 10px; margin-bottom: 30px; justify-content: center; align-items: center; }
+        .btn { padding: 8px 16px; border: none; border-radius: 4px; cursor: pointer; font-weight: 600; transition: all 0.2s; font-size: 0.9em; display: inline-flex; align-items: center; gap: 5px; }
+        .btn-primary { background: #3498db; color: white; }
+        .btn-primary:hover { background: #2980b9; }
+        .btn-secondary { background: #95a5a6; color: white; }
+        .btn-secondary:hover { background: #7f8c8d; }
+        
+        .btn-danger { background: #e74c3c; color: white; }
+        .btn-danger:hover { background: #c0392b; }
+        .btn-warning { background: #f39c12; color: white; }
+        .btn-warning:hover { background: #e67e22; }
+
+        .btn-toggle { background: #27ae60; color: white; }
+        .btn-toggle:hover { background: #219150; }
+        .btn-small { padding: 4px 8px; font-size: 0.75em; margin-left: 10px; }
+
+        .section-header { display: flex; justify-content: space-between; align-items: center; border-bottom: 2px solid #ecf0f1; padding-bottom: 10px; margin-top: 30px; }
+        h2 { color: #34495e; margin: 0; font-size: 1.2em; }
+        
+        .grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap: 15px; padding-top: 15px; }
+        .item { background: #f9f9f9; padding: 12px; border-radius: 6px; border: 1px solid #eee; display: flex; align-items: center; transition: all 0.2s; position: relative; }
+        .item:hover { transform: translateY(-2px); box-shadow: 0 4px 8px rgba(0,0,0,0.05); background: #fff; }
+        
+        .item-folder { border-left: 4px solid #f1c40f; cursor: pointer; }
+        .item-file { border-left: 4px solid #3498db; }
+        
+        .item a, .item span { text-decoration: none; color: #2c3e50; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-weight: 500; width: 100%; display: block; }
+        .item-folder span::before { content: "📁 "; }
+        .item-file a::before { content: "📄 "; }
+
+        .item input[type="checkbox"] { margin-right: 10px; display: none; }
+        .delete-mode .item input[type="checkbox"] { display: block; }
+
+        /* Image Preview Grid Mode */
+        .image-preview-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 15px; padding-top: 15px; }
+        .image-preview-item { position: relative; border-radius: 8px; overflow: hidden; aspect-ratio: 1 / 1; background: #eee; border: 1px solid #ddd; }
+        .image-preview-item img { width: 100%; height: 100%; object-fit: cover; transition: transform 0.3s ease; cursor: pointer; }
+        .image-preview-item .image-name { position: absolute; bottom: 0; left: 0; width: 100%; background: rgba(0,0,0,0.6); color: white; padding: 5px; font-size: 0.8em; text-align: center; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+        .image-preview-item .checkbox-overlay { position: absolute; top: 10px; left: 10px; z-index: 10; display: none; transform: scale(1.5); }
+        .delete-mode .image-preview-item .checkbox-overlay { display: block; }
+
+        input[type="file"] { display: none; }
+
+        /* Generic Modal Styles */
+        .modal-overlay {
+            display: none;
+            position: fixed;
+            z-index: 1000;
+            left: 0;
+            top: 0;
+            width: 100%;
+            height: 100%;
+            background-color: rgba(0,0,0,0.6);
+            align-items: center;
+            justify-content: center;
+        }
+        .modal-content {
+            background-color: white;
+            padding: 30px;
+            border-radius: 8px;
+            width: 90%;
+            max-width: 500px;
+            text-align: center;
+            box-shadow: 0 4px 15px rgba(0,0,0,0.2);
+        }
+        .scrollable-list {
+            max-height: 250px;
+            overflow-y: auto;
+            text-align: left;
+            background: #f8f9fa;
+            padding: 15px;
+            border-radius: 4px;
+            margin: 20px 0;
+            border: 1px solid #eee;
+        }
+        .scrollable-list div { padding: 4px 0; border-bottom: 1px solid #eee; font-size: 0.85em; }
+
+        .progress-container { width: 100%; background-color: #eee; border-radius: 10px; margin: 20px 0; height: 20px; overflow: hidden; }
+        .progress-bar { width: 0%; height: 100%; background-color: #27ae60; transition: width 0.1s; }
+        .progress-text { font-weight: bold; color: #27ae60; font-size: 1.2em; }
+
+        .empty-state { color: #95a5a6; font-style: italic; font-size: 0.9em; }
+        .hidden { display: none !important; }
+    </style>
+</head>
+<body id="body">
+    <div class="container">
+        <h1>Tailspace</h1>
+
+        <div class="usage-container">
+            <div class="usage-header">
+                <span>Storage Usage</span>
+                <span id="usage-text">Calculating...</span>
+            </div>
+            <div class="usage-bar-bg">
+                <div class="usage-bar-fill" id="usage-bar"></div>
+            </div>
+        </div>
+
+        <div class="breadcrumb" id="breadcrumb">
+            <span onclick="navigateTo('')">Home</span>
+        </div>
+        
+        <div class="upload-controls">
+            <button class="btn btn-primary" id="btn-upload-file" onclick="document.getElementById('fileInput').click()">Upload Files</button>
+            <button class="btn btn-secondary" id="btn-upload-folder" onclick="document.getElementById('folderInput').click()">Upload Folder</button>
+            <button class="btn btn-warning" id="btn-delete-mode" onclick="toggleDeleteMode()">
+                <span id="btn-delete-text">Delete Mode</span>
+                <span id="selected-count"></span>
+            </button>
+            <button class="btn btn-danger hidden" id="btn-delete-action" onclick="showDeleteConfirm()">Delete Selected</button>
+            <input type="file" id="fileInput" multiple>
+            <input type="file" id="folderInput" webkitdirectory directory multiple>
+        </div>
+
+        <div id="content">
+            <div class="section-header">
+                <h2>Folders</h2>
+            </div>
+            <div class="grid" id="list-folders"></div>
+
+            <div class="section-header">
+                <h2>Images</h2>
+                <div>
+                    <button class="btn btn-secondary btn-small hidden select-all-btn" onclick="selectAllInSection('images')">Select All</button>
+                    <button class="btn btn-toggle" id="toggle-preview" onclick="toggleImagePreview()">Preview</button>
+                </div>
+            </div>
+            <div id="list-images-container">
+                <div class="grid" id="list-images"></div>
+            </div>
+            
+            <div class="section-header">
+                <h2>Videos</h2>
+                <button class="btn btn-secondary btn-small hidden select-all-btn" onclick="selectAllInSection('videos')">Select All</button>
+            </div>
+            <div class="grid" id="list-videos"></div>
+            
+            <div class="section-header">
+                <h2>Documents</h2>
+                <button class="btn btn-secondary btn-small hidden select-all-btn" onclick="selectAllInSection('documents')">Select All</button>
+            </div>
+            <div class="grid" id="list-documents"></div>
+
+            <div class="section-header">
+                <h2>Audio</h2>
+                <button class="btn btn-secondary btn-small hidden select-all-btn" onclick="selectAllInSection('audio')">Select All</button>
+            </div>
+            <div class="grid" id="list-audio"></div>
+
+            <div class="section-header">
+                <h2>Hidden Files</h2>
+                <button class="btn btn-secondary btn-small hidden select-all-btn" onclick="selectAllInSection('hidden')">Select All</button>
+            </div>
+            <div class="grid" id="list-hidden"></div>
+            
+            <div class="section-header">
+                <h2>Others</h2>
+                <button class="btn btn-secondary btn-small hidden select-all-btn" onclick="selectAllInSection('others')">Select All</button>
+            </div>
+            <div class="grid" id="list-others"></div>
+        </div>
+    </div>
+
+    <!-- Progress Modal -->
+    <div id="progressModal" class="modal-overlay">
+        <div class="modal-content">
+            <h3 id="modalTitle">Uploading...</h3>
+            <div class="progress-container">
+                <div class="progress-bar" id="progressBar"></div>
+            </div>
+            <div class="progress-text" id="progressPercent">0%</div>
+        </div>
+    </div>
+
+    <!-- Delete Confirmation Modal -->
+    <div id="deleteConfirmModal" class="modal-overlay">
+        <div class="modal-content">
+            <h3>Are you sure?</h3>
+            <p>The following files will be permanently deleted:</p>
+            <div class="scrollable-list" id="delete-list"></div>
+            <div style="display:flex; gap: 10px; justify-content: center;">
+                <button class="btn btn-secondary" onclick="closeDeleteConfirm()">Cancel</button>
+                <button class="btn btn-danger" onclick="executeDelete()">Yes, Delete Them</button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        let currentPath = '';
+        let isImagePreviewMode = false;
+        let isDeleteMode = false;
+        let lastFullData = null;
+        let selectedFiles = new Set(); // Stores file paths
+
+        function formatBytes(bytes) {
+            if (bytes === 0) return '0 Bytes';
+            const k = 1024;
+            const sizes = ['Bytes', 'KB', 'MB', 'GB', 'TB'];
+            const i = Math.floor(Math.log(bytes) / Math.log(k));
+            return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
+        }
+
+        function updateUsage() {
+            fetch('/api/usage')
+            .then(res => res.json())
+            .then(data => {
+                const usedStr = formatBytes(data.used);
+                const totalStr = formatBytes(data.total);
+                document.getElementById('usage-text').innerText = `${usedStr} used of ${totalStr} (${data.percent}%)`;
+                document.getElementById('usage-bar').style.width = data.percent + '%';
+            })
+            .catch(err => console.error('Error fetching usage:', err));
+        }
+
+        function updateBreadcrumb() {
+            const bc = document.getElementById('breadcrumb');
+            let html = '<span onclick="navigateTo(\'\')">Home</span>';
+            if (currentPath) {
+                const parts = currentPath.split('/').filter(p => p);
+                let pathAcc = '';
+                parts.forEach((part, index) => {
+                    pathAcc += (index === 0 ? '' : '/') + part;
+                    const isLast = index === parts.length - 1;
+                    html += ` / <span class="${isLast ? 'active' : ''}" onclick="navigateTo('${pathAcc}')">${part}</span>`;
+                });
+            }
+            bc.innerHTML = html;
+        }
+
+        function navigateTo(path) {
+            currentPath = path;
+            selectedFiles.clear();
+            updateSelectedCount();
+            updateBreadcrumb();
+            loadFiles();
+        }
+
+        function toggleDeleteMode() {
+            isDeleteMode = !isDeleteMode;
+            const body = document.getElementById('body');
+            const btn = document.getElementById('btn-delete-mode');
+            const btnText = document.getElementById('btn-delete-text');
+            const deleteAction = document.getElementById('btn-delete-action');
+            const selectAllBtns = document.querySelectorAll('.select-all-btn');
+
+            if (isDeleteMode) {
+                body.classList.add('delete-mode');
+                btnText.innerText = 'Exit Delete Mode';
+                btn.classList.add('btn-primary');
+                btn.classList.remove('btn-warning');
+                deleteAction.classList.remove('hidden');
+                selectAllBtns.forEach(b => b.classList.remove('hidden'));
+            } else {
+                body.classList.remove('delete-mode');
+                btnText.innerText = 'Delete Mode';
+                btn.classList.add('btn-warning');
+                btn.classList.remove('btn-primary');
+                deleteAction.classList.add('hidden');
+                selectAllBtns.forEach(b => b.classList.add('hidden'));
+                selectedFiles.clear();
+            }
+            updateSelectedCount();
+        }
+
+        function toggleFileSelection(path) {
+            if (selectedFiles.has(path)) selectedFiles.delete(path);
+            else selectedFiles.add(path);
+            updateSelectedCount();
+        }
+
+        function updateSelectedCount() {
+            const countSpan = document.getElementById('selected-count');
+            if (countSpan) {
+                if (isDeleteMode && selectedFiles.size > 0) {
+                    countSpan.innerText = `(${selectedFiles.size})`;
+                } else {
+                    countSpan.innerText = '';
+                }
+            }
+        }
+
+        function selectAllInSection(section) {
+            if (!lastFullData || !lastFullData[section]) return;
+            lastFullData[section].forEach(file => {
+                selectedFiles.add(file.path);
+            });
+            // Update checkboxes visually
+            document.querySelectorAll(`[data-section="${section}"] input[type="checkbox"]`).forEach(cb => cb.checked = true);
+            updateSelectedCount();
+        }
+
+        function showDeleteConfirm() {
+            if (selectedFiles.size === 0) return alert('No files selected.');
+            const list = document.getElementById('delete-list');
+            list.innerHTML = '';
+            
+            selectedFiles.forEach(selectedPath => {
+                let foundName = selectedPath.split('/').pop();
+                
+                if (lastFullData) {
+                    for (let section in lastFullData) {
+                        if (Array.isArray(lastFullData[section])) {
+                            const file = lastFullData[section].find(f => f.path === selectedPath);
+                            if (file) {
+                                foundName = file.name;
+                                break;
+                            }
+                        }
+                    }
+                }
+                
+                const el = document.createElement('div');
+                el.innerText = foundName;
+                list.appendChild(el);
+            });
+            
+            document.getElementById('deleteConfirmModal').style.display = 'flex';
+        }
+
+        function closeDeleteConfirm() {
+            document.getElementById('deleteConfirmModal').style.display = 'none';
+        }
+
+        function executeDelete() {
+            const filesToDelete = Array.from(selectedFiles);
+            fetch('/api/delete', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ files: filesToDelete })
+            })
+            .then(res => res.json())
+            .then(() => {
+                closeDeleteConfirm();
+                selectedFiles.clear();
+                toggleDeleteMode();
+                loadFiles();
+                updateUsage();
+            })
+            .catch(() => alert('Deletion failed.'));
+        }
+
+        function toggleImagePreview() {
+            isImagePreviewMode = !isImagePreviewMode;
+            const btn = document.getElementById('toggle-preview');
+            btn.innerText = isImagePreviewMode ? 'List View' : 'Preview';
+            renderImages(lastFullData.images);
+        }
+
+        function renderImages(images) {
+            const container = document.getElementById('list-images-container');
+            container.innerHTML = '';
+            if (!images || images.length === 0) {
+                container.innerHTML = '<div class="grid"><span class="empty-state">No images yet.</span></div>';
+                return;
+            }
+
+            const gridClass = isImagePreviewMode ? 'image-preview-grid' : 'grid';
+            const grid = document.createElement('div');
+            grid.className = gridClass;
+            grid.setAttribute('data-section', 'images');
+
+            images.forEach(file => {
+                const isSelected = selectedFiles.has(file.path);
+                if (isImagePreviewMode) {
+                    const el = document.createElement('div');
+                    el.className = 'image-preview-item';
+                    el.innerHTML = `
+                        <input type="checkbox" class="checkbox-overlay" ${isSelected ? 'checked' : ''} onchange="toggleFileSelection('${file.path}')">
+                        <img src="${file.url}" onclick="window.open('${file.url}', '_blank')">
+                        <div class="image-name">${file.name}</div>
+                    `;
+                    grid.appendChild(el);
+                } else {
+                    const el = document.createElement('div');
+                    el.className = 'item item-file';
+                    el.innerHTML = `
+                        <input type="checkbox" ${isSelected ? 'checked' : ''} onchange="toggleFileSelection('${file.path}')">
+                        <a href="${file.url}" target="_blank" title="${file.name}">${file.name}</a>
+                    `;
+                    grid.appendChild(el);
+                }
+            });
+            container.appendChild(grid);
+        }
+
+        document.getElementById('fileInput').addEventListener('change', (e) => handleUpload(e.target.files));
+        document.getElementById('folderInput').addEventListener('change', (e) => {
+            const files = e.target.files;
+            if (files.length > 0) {
+                const folderName = files[0].webkitRelativePath.split('/')[0];
+                handleUpload(files, folderName);
+            }
+        });
+
+        function handleUpload(files, folderName = null) {
+            if (files.length === 0) return;
+            const modal = document.getElementById('progressModal');
+            const bar = document.getElementById('progressBar');
+            const text = document.getElementById('progressPercent');
+            const title = document.getElementById('modalTitle');
+            modal.style.display = 'flex';
+            bar.style.width = '0%';
+            text.innerText = '0%';
+            title.innerText = folderName ? `Uploading Folder: ${folderName}` : 'Uploading Files...';
+
+            const formData = new FormData();
+            for (let i = 0; i < files.length; i++) formData.append('files', files[i]);
+            if (folderName) formData.append('folderName', folderName);
+
+            const xhr = new XMLHttpRequest();
+            xhr.open('POST', `/upload?path=${encodeURIComponent(currentPath)}`, true);
+            xhr.upload.onprogress = (e) => {
+                if (e.lengthComputable) {
+                    const percent = Math.round((e.loaded / e.total) * 100);
+                    bar.style.width = percent + '%';
+                    text.innerText = percent + '%';
+                }
+            };
+            xhr.onload = () => {
+                modal.style.display = 'none';
+                if (xhr.status === 200) {
+                    document.getElementById('fileInput').value = '';
+                    document.getElementById('folderInput').value = '';
+                    loadFiles();
+                    updateUsage();
+                } else alert('Upload failed.');
+            };
+            xhr.onerror = () => { modal.style.display = 'none'; alert('Upload failed.'); };
+            xhr.send(formData);
+        }
+
+        function loadFiles() {
+            fetch(`/api/files?path=${encodeURIComponent(currentPath)}`)
+            .then(res => res.json())
+            .then(data => {
+                lastFullData = data;
+                const folderContainer = document.getElementById('list-folders');
+                folderContainer.innerHTML = '';
+                if (data.folders.length > 0) {
+                    data.folders.forEach(f => {
+                        const el = document.createElement('div');
+                        el.className = 'item item-folder';
+                        el.onclick = () => navigateTo(f.path);
+                        el.innerHTML = `<span>${f.name}</span>`;
+                        folderContainer.appendChild(el);
+                    });
+                } else folderContainer.innerHTML = '<span class="empty-state">No folders here.</span>';
+
+                renderImages(data.images);
+
+                ['videos', 'documents', 'audio', 'hidden', 'others'].forEach(cat => {
+                    const container = document.getElementById(`list-${cat}`);
+                    container.innerHTML = '';
+                    container.setAttribute('data-section', cat);
+                    if (data[cat] && data[cat].length > 0) {
+                        data[cat].forEach(file => {
+                            const isSelected = selectedFiles.has(file.path);
+                            const el = document.createElement('div');
+                            el.className = 'item item-file';
+                            el.innerHTML = `
+                                <input type="checkbox" ${isSelected ? 'checked' : ''} onchange="toggleFileSelection('${file.path}')">
+                                <a href="${file.url}" target="_blank" title="${file.name}">${file.name}</a>
+                            `;
+                            container.appendChild(el);
+                        });
+                    } else container.innerHTML = `<span class="empty-state">No files yet.</span>`;
+                });
+            });
+        }
+
+        loadFiles();
+        updateUsage();
+    </script>
+</body>
+</html>

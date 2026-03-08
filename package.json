@@ -1,0 +1,26 @@
+{
+  "name": "tailspace",
+  "version": "1.0.0",
+  "description": "Self-hosted storage server over Tailscale",
+  "main": "server.js",
+  "bin": {
+    "tailspace": "./bin/tailspace.js"
+  },
+  "scripts": {
+    "start": "node server.js",
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "keywords": [
+    "tailscale",
+    "storage",
+    "self-hosted"
+  ],
+  "author": "Keshav Vinayak Jha",
+  "license": "ISC",
+  "dependencies": {
+    "express": "^4.21.2",
+    "mime-types": "^2.1.35",
+    "multer": "^1.4.5-lts.1",
+    "yargs": "^17.7.2"
+  }
+}
