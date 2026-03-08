@@ -20,17 +20,17 @@ const argv = yargs(hideBin(process.argv))
     description: 'Port to run the server on',
     default: 3000,
   })
-  .option('owner', {
-    alias: 'o',
+  .option('authorized', {
+    alias: 'a',
     type: 'string',
-    description: 'The Tailscale email authorized to access this server',
+    description: 'Comma-separated list of Tailscale emails authorized to access this server',
     demandOption: true,
   })
   .argv;
 
 const app = express();
 const uploadDir = argv.dir;
-const authorizedOwner = argv.owner;
+const authorizedUsers = argv.authorized.split(',').map(u => u.trim());
 
 if (!fs.existsSync(uploadDir)) {
   fs.mkdirSync(uploadDir, { recursive: true });
@@ -58,10 +58,10 @@ app.use((req, res, next) => {
     try {
       const data = JSON.parse(stdout);
       const email = data.UserProfile?.LoginName;
-      if (email === authorizedOwner) {
+      if (authorizedUsers.includes(email)) {
         next();
       } else {
-        console.warn(`Access denied for user: ${email}. Authorized owner is: ${authorizedOwner}`);
+        console.warn(`Access denied for user: ${email}. Authorized users: ${authorizedUsers.join(', ')}`);
         return res.status(403).send('Forbidden: Unauthorized Tailscale user.');
       }
     } catch (e) {

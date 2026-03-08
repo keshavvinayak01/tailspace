@@ -22,16 +22,19 @@ npm install -g tailspace
 
 ## Getting Started
 
-### 1. Login
-Set the Tailscale email address that is authorized to access your storage:
+### 1. Authorize Users
+Add the Tailscale email addresses that are authorized to access your storage:
 ```bash
-tailspace login your-email@gmail.com
+tailspace auth add your-email@gmail.com
+tailspace auth add friend-email@gmail.com
 ```
 
-### 2. Logout
-Clear your authorized identity:
+### 2. Manage Access
+You can list, remove, or clear authorized users:
 ```bash
-tailspace logout
+tailspace auth list
+tailspace auth remove friend-email@gmail.com
+tailspace auth clear
 ```
 
 ### 3. Start the Server

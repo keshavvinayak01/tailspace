@@ -15,25 +15,33 @@ function saveConfig(config) {
 
 function loadConfig() {
     if (fs.existsSync(CONFIG_FILE)) {
-        return JSON.parse(fs.readFileSync(CONFIG_FILE, 'utf8'));
+        try {
+            return JSON.parse(fs.readFileSync(CONFIG_FILE, 'utf8'));
+        } catch (e) {
+            return { authorized: [] };
+        }
     }
-    return {};
+    return { authorized: [] };
 }
 
 const argv = yargs(hideBin(process.argv))
-  .command('login [email]', 'Authenticate with your Tailscale email', (y) => {
-    return y.positional('email', {
-      describe: 'Tailscale email to authorize',
-      type: 'string'
-    });
+  .command('auth <action> [email]', 'Manage authorized Tailscale users', (y) => {
+    return y
+      .positional('action', {
+        choices: ['add', 'remove', 'list', 'clear'],
+        describe: 'Action to perform'
+      })
+      .positional('email', {
+        describe: 'Email to add or remove',
+        type: 'string'
+      });
   })
-  .command('logout', 'Clear your Tailscale identity configuration', () => {})
   .command('start', 'Start the tailspace server', (y) => {
     return y
       .option('dir', {
         alias: 'd',
         type: 'string',
-        description: 'The mounted folder to expose',
+        description: 'The folder to expose',
         demandOption: true,
       })
       .option('port', {
@@ -42,10 +50,10 @@ const argv = yargs(hideBin(process.argv))
         description: 'Port to run the server on',
         default: 3000,
       })
-      .option('owner', {
-        alias: 'o',
+      .option('authorized', {
+        alias: 'a',
         type: 'string',
-        description: 'Override the authorized Tailscale email',
+        description: 'Override authorized users (comma-separated)',
       });
   })
   .help()
@@ -53,39 +61,49 @@ const argv = yargs(hideBin(process.argv))
 
 const command = argv._[0];
 
-if (command === 'login') {
+if (command === 'auth') {
+    const config = loadConfig();
+    if (!config.authorized) config.authorized = [];
+    
+    const action = argv.action;
     const email = argv.email;
-    if (!email) {
-        console.error('Error: Please provide an email. Usage: tailspace login <email>');
-        process.exit(1);
-    }
-    saveConfig({ owner: email });
-    console.log(`Successfully logged in as: ${email}`);
-    console.log(`Any device logged into Tailscale with this email will now have access.`);
-    process.exit(0);
-}
 
-if (command === 'logout') {
-    if (fs.existsSync(CONFIG_FILE)) {
-        fs.unlinkSync(CONFIG_FILE);
-        console.log('Successfully logged out. Identity configuration cleared.');
-    } else {
-        console.log('No active login found.');
+    if (action === 'add') {
+        if (!email) { console.error('Error: Email required.'); process.exit(1); }
+        if (!config.authorized.includes(email)) {
+            config.authorized.push(email);
+            saveConfig(config);
+            console.log(`Added ${email} to authorized users.`);
+        } else {
+            console.log(`${email} is already authorized.`);
+        }
+    } else if (action === 'remove') {
+        if (!email) { console.error('Error: Email required.'); process.exit(1); }
+        config.authorized = config.authorized.filter(e => e !== email);
+        saveConfig(config);
+        console.log(`Removed ${email} from authorized users.`);
+    } else if (action === 'list') {
+        console.log('Authorized Users:');
+        if (config.authorized.length === 0) console.log('  (None)');
+        else config.authorized.forEach(e => console.log(`  - ${e}`));
+    } else if (action === 'clear') {
+        saveConfig({ authorized: [] });
+        console.log('Cleared all authorized users.');
     }
     process.exit(0);
 }
 
 if (command === 'start') {
   const config = loadConfig();
-  const owner = argv.owner || config.owner;
+  const authorized = argv.authorized || config.authorized?.join(',');
 
-  if (!owner) {
-      console.error('Error: No authorized owner set. Please run "tailspace login <email>" first or use --owner <email>.');
+  if (!authorized || authorized.length === 0) {
+      console.error('Error: No authorized users set. Run "tailspace auth add <email>" first.');
       process.exit(1);
   }
 
   const serverPath = path.join(__dirname, '../server.js');
-  const args = [serverPath, '--dir', argv.dir, '--port', argv.port, '--owner', owner];
+  const args = [serverPath, '--dir', argv.dir, '--port', argv.port, '--authorized', authorized];
   
   const server = spawn('node', args, {
     stdio: 'inherit',
