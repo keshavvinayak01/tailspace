@@ -1,11 +1,15 @@
 #!/usr/bin/env node
 
-const { spawn } = require('child_process');
-const path = require('path');
-const fs = require('fs');
-const os = require('os');
-const yargs = require('yargs/yargs');
-const { hideBin } = require('yargs/helpers');
+import { spawn } from 'child_process';
+import path from 'path';
+import fs from 'fs';
+import os from 'os';
+import yargs from 'yargs/yargs';
+import { hideBin } from 'yargs/helpers';
+import { fileURLToPath } from 'url';
+
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
 
 const CONFIG_FILE = path.join(os.homedir(), '.tailspace.json');
 

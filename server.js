@@ -1,17 +1,21 @@
-const express = require('express');
-const multer = require('multer');
-const path = require('path');
-const fs = require('fs');
-const { execFile, exec } = require('child_process');
-const net = require('net');
-const yargs = require('yargs/yargs');
-const { hideBin } = require('yargs/helpers');
+import express from 'express';
+import multer from 'multer';
+import path from 'path';
+import fs from 'fs';
+import { execFile, exec } from 'child_process';
+import net from 'net';
+import yargs from 'yargs/yargs';
+import { hideBin } from 'yargs/helpers';
+import { fileURLToPath } from 'url';
+
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
 
 const argv = yargs(hideBin(process.argv))
   .option('dir', {
     alias: 'd',
     type: 'string',
-    description: 'The mounted folder to expose',
+    description: 'The folder to expose',
     demandOption: true,
   })
   .option('port', {
@@ -23,7 +27,7 @@ const argv = yargs(hideBin(process.argv))
   .option('authorized', {
     alias: 'a',
     type: 'string',
-    description: 'Comma-separated list of Tailscale emails authorized to access this server',
+    description: 'Comma-separated list of Tailscale emails authorized',
     demandOption: true,
   })
   .argv;
@@ -61,7 +65,6 @@ app.use((req, res, next) => {
       if (authorizedUsers.includes(email)) {
         next();
       } else {
-        console.warn(`Access denied for user: ${email}. Authorized users: ${authorizedUsers.join(', ')}`);
         return res.status(403).send('Forbidden: Unauthorized Tailscale user.');
       }
     } catch (e) {
@@ -81,28 +84,21 @@ function getCategoryForFile(filename, mime = '') {
     if (fn.endsWith('.zip') || fn.endsWith('.tar') || fn.endsWith('.gz') || fn.endsWith('.7z') || fn.endsWith('.rar')) {
         return 'others';
     }
-    if (mime.startsWith('image/') || /\.(jpg|jpeg|png|gif|svg|webp|bmp)$/i.test(fn)) return 'images';
-    if (mime.startsWith('video/') || /\.(mp4|mov|avi|mkv|wmv|flv|webm)$/i.test(fn)) return 'videos';
-    if (mime.startsWith('audio/') || /\.(mp3|wav|flac|ogg|m4a|aac)$/i.test(fn)) return 'audio';
-    if (mime.startsWith('text/') || mime === 'application/pdf' || mime.includes('document') || /\.(pdf|doc|docx|txt|rtf|odt|xls|xlsx|ppt|pptx)$/i.test(fn)) return 'documents';
+    if ((mime && mime.startsWith('image/')) || /\.(jpg|jpeg|png|gif|svg|webp|bmp)$/i.test(fn)) return 'images';
+    if ((mime && mime.startsWith('video/')) || /\.(mp4|mov|avi|mkv|wmv|flv|webm)$/i.test(fn)) return 'videos';
+    if ((mime && mime.startsWith('audio/')) || /\.(mp3|wav|flac|ogg|m4a|aac)$/i.test(fn)) return 'audio';
+    if ((mime && (mime.startsWith('text/') || mime === 'application/pdf' || mime.includes('document'))) || /\.(pdf|doc|docx|txt|rtf|odt|xls|xlsx|ppt|pptx)$/i.test(fn)) return 'documents';
     return 'others';
 }
 
-// Dynamic Storage
 const storage = multer.diskStorage({
   destination: function (req, file, cb) {
     const relativePath = req.query.path || '';
     const subfolder = getCategoryForFile(file.originalname, file.mimetype);
-
     let finalPath = path.join(uploadDir, relativePath);
-    if (req.body.folderName) {
-        finalPath = path.join(finalPath, req.body.folderName);
-    }
-
+    if (req.body.folderName) finalPath = path.join(finalPath, req.body.folderName);
     const targetDir = path.join(finalPath, subfolder);
-    if (!fs.existsSync(targetDir)) {
-      fs.mkdirSync(targetDir, { recursive: true });
-    }
+    if (!fs.existsSync(targetDir)) fs.mkdirSync(targetDir, { recursive: true });
     cb(null, targetDir);
   },
   filename: function (req, file, cb) {
@@ -114,18 +110,13 @@ const upload = multer({ storage: storage });
 
 app.use(express.json());
 
-// Upload Endpoint
 app.post('/upload', upload.array('files'), (req, res) => {
   res.json({ message: 'Files uploaded successfully!' });
 });
 
-// Delete Endpoint
 app.post('/api/delete', (req, res) => {
     const { files } = req.body;
-    if (!files || !Array.isArray(files)) {
-        return res.status(400).send('Invalid request: No files provided.');
-    }
-
+    if (!files || !Array.isArray(files)) return res.status(400).send('No files provided.');
     const errors = [];
     files.forEach(fileRelPath => {
         const fullPath = path.join(uploadDir, fileRelPath);
@@ -133,62 +124,32 @@ app.post('/api/delete', (req, res) => {
             errors.push(`Access denied: ${fileRelPath}`);
             return;
         }
-
         try {
-            if (fs.existsSync(fullPath)) {
-                fs.unlinkSync(fullPath);
-            } else {
-                errors.push(`File not found: ${fileRelPath}`);
-            }
+            if (fs.existsSync(fullPath)) fs.unlinkSync(fullPath);
+            else errors.push(`File not found: ${fileRelPath}`);
         } catch (e) {
             errors.push(`Error deleting ${fileRelPath}: ${e.message}`);
         }
     });
-
-    if (errors.length > 0) {
-        res.status(207).json({ message: 'Deletion completed with some errors', errors });
-    } else {
-        res.json({ message: 'All selected files deleted successfully!' });
-    }
+    if (errors.length > 0) res.status(207).json({ message: 'Errors occurred', errors });
+    else res.json({ message: 'Deleted successfully' });
 });
 
-// List Files Endpoint
 app.get('/api/files', (req, res) => {
     const relativePath = req.query.path || '';
     const targetDir = path.join(uploadDir, relativePath);
-
-    if (!fs.existsSync(targetDir)) {
-        return res.status(404).json({ error: 'Directory not found' });
-    }
-
-    const result = {
-        folders: [],
-        images: [],
-        videos: [],
-        documents: [],
-        audio: [],
-        hidden: [],
-        others: []
-    };
-
+    if (!fs.existsSync(targetDir)) return res.status(404).json({ error: 'Not found' });
+    const result = { folders: [], images: [], videos: [], documents: [], audio: [], hidden: [], others: [] };
     try {
         const items = fs.readdirSync(targetDir, { withFileTypes: true });
-        
         items.forEach(item => {
             if (item.isDirectory()) {
-                if (!categories.includes(item.name)) {
-                    result.folders.push({ name: item.name, path: path.join(relativePath, item.name) });
-                }
+                if (!categories.includes(item.name)) result.folders.push({ name: item.name, path: path.join(relativePath, item.name) });
             } else if (item.isFile()) {
                 const cat = getCategoryForFile(item.name);
-                result[cat].push({
-                    name: item.name,
-                    url: `/files/${path.join(relativePath, item.name)}`,
-                    path: path.join(relativePath, item.name)
-                });
+                result[cat].push({ name: item.name, url: `/files/${path.join(relativePath, item.name)}`, path: path.join(relativePath, item.name) });
             }
         });
-
         categories.forEach(cat => {
             const catPath = path.join(targetDir, cat);
             if (fs.existsSync(catPath) && fs.statSync(catPath).isDirectory()) {
@@ -196,44 +157,30 @@ app.get('/api/files', (req, res) => {
                 files.forEach(file => {
                     const filePath = path.join(catPath, file);
                     if (fs.statSync(filePath).isFile()) {
-                        result[cat].push({
-                            name: file,
-                            url: `/files/${path.join(relativePath, cat, file)}`,
-                            path: path.join(relativePath, cat, file)
-                        });
+                        result[cat].push({ name: file, url: `/files/${path.join(relativePath, cat, file)}`, path: path.join(relativePath, cat, file) });
                     }
                 });
             }
         });
-
         res.json(result);
-    } catch (e) {
-        res.status(500).send('Error reading directory');
-    }
+    } catch (e) { res.status(500).send('Error reading directory'); }
 });
 
-// API Endpoint for Usage Stats
 app.get('/api/usage', (req, res) => {
     exec(`df -B1 "${uploadDir}"`, (error, stdout) => {
-        if (error) return res.status(500).send('Error getting disk usage');
+        if (error) return res.status(500).send('Error');
         const lines = stdout.trim().split('\n');
         const dataLine = lines[lines.length - 1];
         const stats = dataLine.replace(/\s+/g, ' ').split(' ');
         const totalSpace = parseInt(stats[1]);
-        
         exec(`du -sb "${uploadDir}"`, (duError, duStdout) => {
-            if (duError) return res.status(500).send('Error calculating folder size');
+            if (duError) return res.status(500).send('Error');
             const usedSpace = parseInt(duStdout.trim().split('\t')[0]);
-            res.json({
-                used: usedSpace,
-                total: totalSpace,
-                percent: ((usedSpace / totalSpace) * 100).toFixed(2)
-            });
+            res.json({ used: usedSpace, total: totalSpace, percent: ((usedSpace / totalSpace) * 100).toFixed(2) });
         });
     });
 });
 
-// --- STATIC ROUTES LAST ---
 app.use(express.static(path.join(__dirname, 'public')));
 app.use('/files', express.static(uploadDir));
 
