@@ -2,6 +2,7 @@
   "name": "tailspace",
   "version": "1.0.0",
   "description": "Self-hosted storage server over Tailscale",
+  "type": "commonjs",
   "main": "server.js",
   "bin": {
     "tailspace": "./bin/tailspace.js"
