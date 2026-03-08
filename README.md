@@ -14,19 +14,10 @@ A self-hosted storage server designed to be accessible only via your private **T
 
 ## Installation
 
+Install Tailspace globally via npm:
+
 ```bash
-# Clone the repository
-git clone <your-repo-url>
-cd tailspace/src
-
-# Install dependencies
-npm install
-
-# Install the CLI globally (locally for your user)
-npm install -g . --prefix ~/.local
-
-# Add ~/.local/bin to your path if you haven't already (fish shell example)
-fish_add_path ~/.local/bin
+npm install -g tailspace
 ```
 
 ## Getting Started
